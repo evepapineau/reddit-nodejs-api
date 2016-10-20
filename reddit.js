@@ -48,7 +48,7 @@ module.exports = function RedditAPI(conn) {
                       3b. If the insert succeeds, re-fetch the user from the DB
                       4. If the re-fetch succeeds, return the object to the caller
                       */
-                        callback(null, result[0]);
+                      callback(null, result[0]);
                     }
                   }
                 );
@@ -58,7 +58,7 @@ module.exports = function RedditAPI(conn) {
         }
       });
     },
-    createPost: function(post, callback) {
+    createPost: function (post, callback) {
       conn.query(
         'INSERT INTO posts (userId, title, url, createdAt) VALUES (?, ?, ?, ?)', [post.userId, post.title, post.url, new Date()],
         function(err, result) {
@@ -93,22 +93,104 @@ module.exports = function RedditAPI(conn) {
       }
       var limit = options.numPerPage || 25; // if options.numPerPage is "falsy" then use 25
       var offset = (options.page || 0) * limit;
-      
-      conn.query(`
-        SELECT id, title, url, userId, createdAt, updatedAt
-        FROM posts
-        ORDER BY createdAt DESC
-        LIMIT ? OFFSET ?`
+      conn.query(
+      `SELECT posts.id AS postId, posts.title AS postTitle, 
+      posts.url AS postURL, posts.userId AS postUserId, 
+      posts.createdAt AS postCreate, posts.updatedAt AS postsUpdate, 
+      users.id AS userId, users.username AS username, users.createdAt AS userCreate, 
+      users.updatedAt AS userUpdate FROM posts JOIN users ON posts.userId=users.id`
         , [limit, offset],
         function(err, results) {
           if (err) {
-            callback(err);
+            console.log('err', err);
           }
           else {
-            callback(null, results);
+            var newArray = results.map(function (res) {
+              return {
+                'id: ': res.postId,
+                'title: ': res.postTitle,
+                'url: ': res.postURL,
+                'created at: ': res.postCreate,
+                'updated at: ': res.postUpdate,
+                'user ID: ': res.postUserId,
+                'user: ': {
+                  'id: ': res.userId,
+                  'username: ': res.username,
+                  'created at: ': res.userCreate,
+                  'updated at: ': res.userUpdate
+                }
+              }
+            });
+            console.log(newArray);
           }
         }
       );
+    },
+    getAllPostsForUser: function(userId, options, callback) {
+      if (!callback) {
+        callback = options;
+        options = {};
+      }
+      var limit = options.numPerPage || 25; // if options.numPerPage is "falsy" then use 25
+      var offset = (options.page || 0) * limit;
+      conn.query(
+      `SELECT posts.id AS postId, posts.title AS postTitle, 
+      posts.url AS postURL, posts.userId AS postUserId, 
+      posts.createdAt AS postCreate, posts.updatedAt AS postsUpdate, 
+      users.id AS userId, users.username AS username, users.createdAt AS userCreate, 
+      users.updatedAt AS userUpdate FROM posts JOIN users ON posts.userId=users.id WHERE userID = ?`
+        , [userId, limit, offset],
+         function(err, results) {
+          if (err) {
+            console.log('err', err);
+          }
+          else {
+            var newArray = results.map(function (res) {
+              return {
+                'id: ': res.postId,
+                'title: ': res.postTitle,
+                'url: ': res.postURL,
+                'created at: ': res.postCreate,
+                'updated at: ': res.postUpdate,
+                'user ID: ': res.postUserId,
+                'user: ': {
+                  'id: ': res.userId,
+                  'username: ': res.username,
+                  'created at: ': res.userCreate,
+                  'updated at: ': res.userUpdate
+                }
+              }
+            });
+            console.log(newArray);
+          }
+        }
+      );
+    },
+    getSinglePost: function (postId, callback) {
+      conn.query(
+      `SELECT posts.id AS postId, posts.title AS postTitle, 
+      posts.url AS postURL, posts.userId AS postUserId, 
+      posts.createdAt AS postCreate, posts.updatedAt AS postUpdate,
+      users.id AS userId, users.username AS username, users.createdAt AS userCreate, 
+      users.updatedAt AS userUpdate FROM posts JOIN users 
+      WHERE posts.id = ?`, [postId],
+        function(err, results) {
+          if (err) {
+            console.log('err', err);
+          }
+          else {
+            var newArray = {
+                'id: ': results[0].postId,
+                'title: ': results[0].postTitle,
+                'url: ': results[0].postURL,
+                'created at: ': results[0].postCreate,
+                'updated at: ': results[0].postUpedate,
+                'user ID: ': results[0].postUserId,
+              }
+          }
+          console.log(newArray);
+        }
+      )
     }
   }
 }
