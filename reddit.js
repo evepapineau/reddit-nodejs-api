@@ -58,9 +58,13 @@ module.exports = function RedditAPI(conn) {
         }
       });
     },
-    createPost: function (post, callback) {
+    createPost: function (post, subredditId, callback) {
+      if (!subredditId) {
+        callback(new Error('subredditId is required'));
+        return;
+      }
       conn.query(
-        'INSERT INTO posts (userId, title, url, createdAt) VALUES (?, ?, ?, ?)', [post.userId, post.title, post.url, new Date()],
+        'INSERT INTO posts (userId, title, url, subredditId, createdAt) VALUES (?, ?, ?, ?, ?)', [post.userId, post.title, post.url, subredditId, new Date()],
         function(err, result) {
           if (err) {
             callback(err);
@@ -71,7 +75,7 @@ module.exports = function RedditAPI(conn) {
             the post and send it to the caller!
             */
             conn.query(
-              'SELECT id,title,url,userId, createdAt, updatedAt FROM posts WHERE id = ?', [result.insertId],
+              'SELECT id,title, url, userId, createdAt, updatedAt FROM posts WHERE id = ?', [result.insertId],
               function(err, result) {
                 if (err) {
                   callback(err);
@@ -94,12 +98,86 @@ module.exports = function RedditAPI(conn) {
       var limit = options.numPerPage || 25; // if options.numPerPage is "falsy" then use 25
       var offset = (options.page || 0) * limit;
       conn.query(
-      `SELECT posts.id AS postId, posts.title AS postTitle, 
-      posts.url AS postURL, posts.userId AS postUserId, 
-      posts.createdAt AS postCreate, posts.updatedAt AS postsUpdate, 
-      users.id AS userId, users.username AS username, users.createdAt AS userCreate, 
-      users.updatedAt AS userUpdate FROM posts JOIN users ON posts.userId=users.id`
+      `SELECT 
+        posts.id AS postId, 
+        posts.title AS postTitle, 
+        posts.url AS postURL, 
+        posts.userId AS postUserId, 
+        posts.createdAt AS postCreate, 
+        posts.updatedAt AS postsUpdate,
+        posts.subredditId AS postsSubId,
+        users.id AS userId, 
+        users.username AS username, 
+        users.createdAt AS userCreate, 
+        users.updatedAt AS userUpdate,
+        subreddits.id AS subredditsId, 
+        subreddits.name AS subredditsName, 
+        subreddits.description AS subredditsDesc,
+        subreddits.createdAt AS subredditsCreate, 
+        subreddits.updatedAt AS subredditsUpdate  
+      FROM posts 
+      JOIN users ON posts.userId=users.id
+      JOIN subreddits ON posts.subredditId = subreddits.id
+      ORDER BY posts.createdAt DESC
+      LIMIT ? 
+      OFFSET ?`
         , [limit, offset],
+        function(err, results) {
+          if (err) {
+            console.log('err', err);
+          }
+          else {
+            var newArray = results.map(function (res) {
+              return {
+                'id': res.postId,
+                'title': res.postTitle,
+                'url': res.postURL,
+                'created at': res.postCreate,
+                'updated at': res.postUpdate,
+                'user ID': res.postUserId,
+                'user': {
+                  'id': res.userId,
+                  'username': res.username,
+                  'created at': res.userCreate,
+                  'updated at': res.userUpdate
+                },
+                'subreddit': {
+                  'id': res.subredditsId,
+                  'name': res.subredditsName,
+                  'description': res.subredditsDesc,
+                  'created At': res.subredditsCreate,
+                  'updated At': res.subredditsUpdate
+                }
+              };
+            });
+            return callback(null, newArray);
+          }
+        }
+      );
+    },
+    getAllPostsForUser: function(userId, options, callback) {
+      if (!callback) {
+        callback = options;
+        options = {};
+      }
+      var limit = options.numPerPage || 25; // if options.numPerPage is "falsy" then use 25
+      var offset = (options.page || 0) * limit;
+      conn.query(
+      `SELECT 
+        posts.id AS postId, 
+        posts.title AS postTitle, 
+        posts.url AS postURL, 
+        posts.userId AS postUserId, 
+        posts.createdAt AS postCreate, 
+        posts.updatedAt AS postsUpdate, 
+        users.id AS userId, 
+        users.username AS username, 
+        users.createdAt AS userCreate, 
+        users.updatedAt AS userUpdate 
+      FROM posts 
+      JOIN users ON posts.userId=users.id 
+      WHERE userID = ?`
+        , [userId, limit, offset],
         function(err, results) {
           if (err) {
             console.log('err', err);
@@ -119,47 +197,7 @@ module.exports = function RedditAPI(conn) {
                   'created at: ': res.userCreate,
                   'updated at: ': res.userUpdate
                 }
-              }
-            });
-            console.log(newArray);
-          }
-        }
-      );
-    },
-    getAllPostsForUser: function(userId, options, callback) {
-      if (!callback) {
-        callback = options;
-        options = {};
-      }
-      var limit = options.numPerPage || 25; // if options.numPerPage is "falsy" then use 25
-      var offset = (options.page || 0) * limit;
-      conn.query(
-      `SELECT posts.id AS postId, posts.title AS postTitle, 
-      posts.url AS postURL, posts.userId AS postUserId, 
-      posts.createdAt AS postCreate, posts.updatedAt AS postsUpdate, 
-      users.id AS userId, users.username AS username, users.createdAt AS userCreate, 
-      users.updatedAt AS userUpdate FROM posts JOIN users ON posts.userId=users.id WHERE userID = ?`
-        , [userId, limit, offset],
-         function(err, results) {
-          if (err) {
-            console.log('err', err);
-          }
-          else {
-            var newArray = results.map(function (res) {
-              return {
-                'id: ': res.postId,
-                'title: ': res.postTitle,
-                'url: ': res.postURL,
-                'created at: ': res.postCreate,
-                'updated at: ': res.postUpdate,
-                'user ID: ': res.postUserId,
-                'user: ': {
-                  'id: ': res.userId,
-                  'username: ': res.username,
-                  'created at: ': res.userCreate,
-                  'updated at: ': res.userUpdate
-                }
-              }
+              };
             });
             console.log(newArray);
           }
@@ -168,11 +206,19 @@ module.exports = function RedditAPI(conn) {
     },
     getSinglePost: function (postId, callback) {
       conn.query(
-      `SELECT posts.id AS postId, posts.title AS postTitle, 
-      posts.url AS postURL, posts.userId AS postUserId, 
-      posts.createdAt AS postCreate, posts.updatedAt AS postUpdate,
-      users.id AS userId, users.username AS username, users.createdAt AS userCreate, 
-      users.updatedAt AS userUpdate FROM posts JOIN users 
+      `SELECT 
+        posts.id AS postId, 
+        posts.title AS postTitle, 
+        posts.url AS postURL, 
+        posts.userId AS postUserId, 
+        posts.createdAt AS postCreate, 
+        posts.updatedAt AS postUpdate,
+        users.id AS userId, 
+        users.username AS username, 
+        users.createdAt AS userCreate, 
+        users.updatedAt AS userUpdate 
+      FROM posts 
+      JOIN users 
       WHERE posts.id = ?`, [postId],
         function(err, results) {
           if (err) {
@@ -186,11 +232,70 @@ module.exports = function RedditAPI(conn) {
                 'created at: ': results[0].postCreate,
                 'updated at: ': results[0].postUpedate,
                 'user ID: ': results[0].postUserId,
-              }
+              };
           }
           console.log(newArray);
         }
-      )
+      );
+    },
+    createSubreddit: function (sub, callback) {
+      if (!sub || !sub.name) {
+        callback(new Error('name is mandatory'));
+        return;
+      }
+      conn.query(
+        `INSERT INTO subreddits (name, description, createdAt, updatedAt) VALUES (? ,?, ?, ?)`, [sub.name, sub.description, new Date(), new Date()],
+          function (err, result) {
+            if (err) {
+              if (err.code === 'ER_DUP_ENTRY') {
+                callback(new Error('A subreddit with this name already exists'));
+              }
+              else {
+                callback(err);
+              }
+            }
+            else {
+              conn.query(
+              'SELECT id, name, description FROM subreddits WHERE id = ?', [result.insertId],
+              function(err, result) {
+                if (err) {
+                  callback(err);
+                }
+                else {
+                  callback(null, result[0]);
+                }
+              }
+              );
+            }
+          }
+      );
+    },
+    getAllSubreddits: function (callback) {
+      conn.query (
+        `SELECT 
+          subreddits.id AS subredditsId, 
+          subreddits.name AS subredditsName, 
+          subreddits.description AS subredditsDesc
+          subreddits.createdAt AS subredditsCreate, 
+          subreddits.updatedAt AS subredditsUpdate, 
+        FROM subreddits 
+        ORDER BY createdAt DESC`,
+        function (err, result) {
+          if (err) {
+            callback(err);
+          }
+          else {
+            var subList = {
+              'id: ': result[0].id,
+              'name: ': result[0].name,
+              'description: ': result[0].description,
+              'created At: ': result[0].createdAt,
+              'updated At: ': result[0].updatedAt
+            };
+          }
+          console.log(subList);
+        }
+      );
     }
-  }
-}
+  };
+};
