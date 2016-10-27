@@ -1,0 +1,11 @@
+form(action='/posts/', method='POST')
+div(id='contents')
+    h1 List of contents
+    ul
+        each val in posts
+            li
+                content-item_title
+                h2
+                    content-item_title
+                        a(href=val.url)=val.title
+                p='Created by ' + val.user.username
