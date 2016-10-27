@@ -1,11 +1,14 @@
-form(action='/posts/', method='POST')
-div(id='contents')
-    h1 List of contents
-    ul
-        each val in posts
-            li
-                content-item_title
-                h2
-                    content-item_title
-                        a(href=val.url)=val.title
-                p='Created by ' + val.user.username
+extends layout.pug
+
+block title
+  title Welcome to Reddit Clone!!!
+
+block content
+  h1 Welcome to Reddit!!!
+  ul.post-list
+    each post in posts
+      li.post
+        h2
+          a(href=post.url)= post.title
+        p Submitted by #{post.username}
+        p Score: #{post.score} Upvotes: #{post.upVotes} Downvotes: #{post.downVotes}
