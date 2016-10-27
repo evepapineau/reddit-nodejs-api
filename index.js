@@ -25,15 +25,33 @@ app.use(bodyParser.urlencoded({extended: false}));
 // This middleware will parse the Cookie header from all requests, and put the result in req.cookies.  Read the docs for more info!
 app.use(cookieParser());
 
+function checkLoginToken(request, response, next) {
+  // check if there's a SESSION cookie...
+  if (request.cookies.SESSION) {
+    redditAPI.getUserFromSession(request.cookies.SESSION, function(err, user) {
+      if (err) {
+        console.log(err);
+      }
+      else {
+      // if we get back a user object, set it on the request. From now on, this request looks like it was made by this user as far as the rest of the code is concerned
+        if (user) {
+          request.loggedInUser = user;
+        }
+        next();
+      }
+      });
+    }
+  else {
+    // if no SESSION cookie, move forward
+    next();
+  }
+}
+
+app.use(checkLoginToken);
+
 // This middleware will console.log every request to your web server! Read the docs for more info!
 app.use(morgan('dev'));
 
-/*
-IMPORTANT!!!!!!!!!!!!!!!!!
-Before defining our web resources, we will need access to our RedditAPI functions.
-You will need to write (or copy) the code to create a connection to your MySQL database here, and import the RedditAPI.
-Then, you'll be able to use the API inside your app.get/app.post functions as appropriate.
-*/
 
 // Resources
 app.get('/', function(request, response) {
@@ -56,6 +74,29 @@ app.get('/', function(request, response) {
   Response.render will call the Pug module to render your final HTML.
   Check the file views/post-list.pug as well as the README.md to find out more!
   */
+  
+app.post('/createPost', function(request, response) {
+  // before creating content, check if the user is logged in
+  if (!request.loggedInUser) {
+    // HTTP status code 401 means Unauthorized
+    response.status(401).send('You must be logged in to create content!');
+  }
+  else {
+    // here we have a logged in user, let's create the post with the user!
+    redditAPI.createPost({
+      title: request.body.title,
+      url: request.body.url,
+      userId: request.loggedInUser.id
+    }, function(err, post) {
+      if (err) {
+        console.log('There was an error. Please try again.' + err)
+      }
+      else {
+        response.send("Thank you!")
+      }
+    })
+  }
+})  
 
 app.get('/login', function(request, response) {
   // code to display login form
@@ -65,18 +106,20 @@ app.get('/login', function(request, response) {
 app.post('/login', function(request, response) {
   // code to login a user
   // hint: you'll have to use response.cookie here
-  redditAPI.checkLogin({'username': request.body.username}, {'password': request.body.password}, function(err, result) {
+  redditAPI.checkLogin(request.body.username, request.body.password, function(err, user) {
     if (err) {
-      response.sendStatus(400);
+      response.status(401).send(err.message);
     }
     else {
-      console.log(result);
-      //response.send(result);
-      /*
-      1. generate session
-      2. send cookie with session token
-      3. redirect to homepage
-      */
+      redditAPI.createSession(user.id, function(err, token) {
+        if (err) {
+          response.status(500).send('an error occurred. please try again later! ' + err);
+        }
+        else {
+          response.cookie('SESSION', token); // the secret token is now in the user's cookies!
+          response.redirect('/');
+        }
+      });
     }
   })
 });
@@ -91,10 +134,10 @@ app.post('/signup', function(request, response) {
   // ihnt: you'll have to use bcrypt to hash the user's password
   redditAPI.createUser({'username': request.body.username, 'password': request.body.password}, function(err){
     if (err) {
-      response.sendStatus(400); //erreur est ici
+      response.sendStatus(400).send("This username is already in use."); 
     }
     else {
-      response.redirect('/');
+      response.redirect('/login');
     }
   })
 });
