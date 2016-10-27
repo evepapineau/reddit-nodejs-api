@@ -9,17 +9,6 @@ function createSessionToken() {
 
 module.exports = function RedditAPI(conn) {
   return {
-    createSession: function (userId, callback) {
-      var token = createSessionToken();
-      conn.query('INSERT INTO sessions SET userId = ?, token = ?', [userId, token], function(err, result) {
-        if (err) {
-          callback(err);
-        }
-        else {
-          callback(null, token); // this is the secret session token :)
-        }
-      })
-    },
     createUser: function(user, callback) {
       // first we have to hash the password...
       bcrypt.hash(user.password, HASH_ROUNDS, function(err, hashedPassword) {
@@ -105,6 +94,28 @@ module.exports = function RedditAPI(conn) {
         }
       });
     },
+    createSession: function (userId, callback) {
+      var token = createSessionToken();
+      conn.query('INSERT INTO sessions SET userId = ?, token = ?', [userId, token], function(err, result) {
+        console.log('result of insert session', result);
+        if (err) {
+          callback(err);
+        }
+        else {
+          callback(null, token); // this is the secret session token :)
+        }
+      });
+    },
+    getUserFromSession: function (token, callback) {
+      conn.query(`SELECT * FROM sessions WHERE token = ?`, [token], function(err, result) {
+        if (err) {
+          callback(err);
+        }
+        else {
+          callback(null, result);
+        }
+      }
+    )},
     createPost: function (post, subredditId, callback) {
       if (!subredditId) {
         callback(new Error('subredditId is required'));
@@ -114,8 +125,7 @@ module.exports = function RedditAPI(conn) {
         'INSERT INTO posts (userId, title, url, subredditId, createdAt) VALUES (?, ?, ?, ?, ?)', [post.userId, post.title, post.url, post.subredditId, new Date()],
         function(err, result) {
           if (err) {
-            // callback(err);
-            console.log('hello3');
+            callback(err);
           }
           else {
             /*
