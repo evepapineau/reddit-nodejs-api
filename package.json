@@ -10,7 +10,13 @@
   "author": "Ziad Saab <ziad.saab@gmail.com>",
   "license": "ISC",
   "dependencies": {
-    "bcrypt": "^0.8.6",
-    "mysql": "^2.10.2"
+    "bcrypt": "^0.8.7",
+    "body-parser": "^1.15.2",
+    "cookie-parser": "^1.4.3",
+    "express": "^4.14.0",
+    "morgan": "^1.7.0",
+    "mysql": "^2.11.1",
+    "nodemon": "^1.11.0",
+    "secure-random": "^1.1.1"
   }
 }
