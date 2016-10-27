@@ -1,106 +1,118 @@
+// Dependencies
 var express = require('express');
+var bodyParser = require('body-parser');
+var cookieParser = require('cookie-parser');
+var morgan = require('morgan');
 var app = express();
 var mysql = require('mysql');
-var bodyParser = require('body-parser');
+var bcrypt = require('bcrypt');
 app.set('view engine', 'pug');
 
-// create a connection to our Cloud9 server
 var connection = mysql.createConnection({
   host     : 'localhost',
-  user     : 'evepapineau', // CHANGE THIS :)
+  user     : 'evepapineau', 
   password : '',
   database: 'reddit'
 });
 
-// load our API and pass it the connection
 var reddit = require('./reddit');
 var redditAPI = reddit(connection);
 
-// //exercise 1
-app.get('/hello', function (req, res) {
-  res.send('<h1>Hello World!</h1>');
+// Middleware
+// This middleware will parse the POST requests coming from an HTML form, and put the result in req.body.  Read the docs for more info!
+app.use(bodyParser.urlencoded({extended: false}));
+
+// This middleware will parse the Cookie header from all requests, and put the result in req.cookies.  Read the docs for more info!
+app.use(cookieParser());
+
+// This middleware will console.log every request to your web server! Read the docs for more info!
+app.use(morgan('dev'));
+
+/*
+IMPORTANT!!!!!!!!!!!!!!!!!
+Before defining our web resources, we will need access to our RedditAPI functions.
+You will need to write (or copy) the code to create a connection to your MySQL database here, and import the RedditAPI.
+Then, you'll be able to use the API inside your app.get/app.post functions as appropriate.
+*/
+
+// Resources
+app.get('/', function(request, response) {
+  /*
+  Your job here will be to use the RedditAPI.getAllPosts function to grab the real list of posts.
+  For now, we are simulating this with a fake array of posts!
+  */
+  redditAPI.getAllPosts({'numPerPage': 25, 'page': 0}, function(err, posts) {
+    if (err) {
+      response.sendStatus(500);
+    }
+    else {
+      console.log(posts)
+      response.render('post-list', {posts: posts});
+    }
+  });
 });
 
-//exercise 2A
-app.get('/hello', function (req, res){
-     var name = req.query.name;
-     res.send(`<h1>Hello ${name}!</h1>`)
-})
+  /*
+  Response.render will call the Pug module to render your final HTML.
+  Check the file views/post-list.pug as well as the README.md to find out more!
+  */
 
-//exercise 2B
-app.get('/hello/:name', function (req, res){
-     var name = req.params.name;
-     res.send(`<h1>Hello ${name}!</h1>`)
-})
-
-//exercise 3
-app.get('/calculator/:operation', function (req, res){
-    var operation = req.params.operation;
-    var myObj = {
-        "operator: ": operation,
-        "firstOperand: ": parseInt(req.query.num1),
-        "secondOperand: ": parseInt(req.query.num2),
-        }
-        if (operation === "add") {
-        myObj.solution= myObj.firstOperand + myObj.secondOperand;
-        }
-        else if (operation === "sub") {
-        myObj.solution= myObj.firstOperand - myObj.secondOperand;
-        }
-        else if (operation === "mult") {
-        myObj.solution= myObj.firstOperand * myObj.secondOperand;
-        }
-        else if (operation === "div") {
-        myObj.solution= myObj.firstOperand / myObj.secondOperand;
-        }
-        else {
-            res.sendStatus(400);
-        }
-    res.send(myObj);
-})
-
-//exercise 4
-app.get('/posts', function (req, res) {
-    redditAPI.getAllPosts({'numPerPage': 5, 'page': 0}, function (err, posts) {
-        if (err) {
-            res.status(500);
-        }
-        else {
-            console.log(posts.url)
-            res.render('post-list', {posts: posts})
-        }
-    }) 
+app.get('/login', function(request, response) {
+  // code to display login form
+  response.render('login-form');
 });
 
-//exercise 5
-app.get('/createContent', function (req, res) {
-        res.render('create-content');
+app.post('/login', function(request, response) {
+  // code to login a user
+  // hint: you'll have to use response.cookie here
+  redditAPI.checkLogin({'username': request.body.username}, {'password': request.body.password}, function(err, result) {
+    if (err) {
+      response.sendStatus(400);
+    }
+    else {
+      console.log(result);
+      //response.send(result);
+      /*
+      1. generate session
+      2. send cookie with session token
+      3. redirect to homepage
+      */
+    }
+  })
 });
 
-//exercise 6
-app.use(bodyParser());
-
-app.post('/createContent', function(request, response) {
-    var url = request.body.url;
-    var title = request.body.title;
-    redditAPI.createPost({title: request.body.title, url: request.body.url, userId: 1}, 4, function(err, post) {
-        if (err) {
-            console.log(err);
-        }
-        else {
-            // response.send("OK");
-            // response.send(post);
-            response.redirect('/posts');
-        }
-    });
+app.get('/signup', function(request, response) {
+  // code to display signup form
+  response.render('signup-form');
 });
 
-/* YOU DON'T HAVE TO CHANGE ANYTHING BELOW THIS LINE :) */
-
-// Boilerplate code to start up the web server
-var server = app.listen(process.env.PORT, process.env.IP, function () {
-  var host = server.address().address;
-  var port = server.address().port;
-
-  console.log('Example app listening at http://%s:%s', host, port);
+app.post('/signup', function(request, response) {
+  // code to signup a user
+  // ihnt: you'll have to use bcrypt to hash the user's password
+  redditAPI.createUser({'username': request.body.username, 'password': request.body.password}, function(err){
+    if (err) {
+      response.sendStatus(400); //erreur est ici
+    }
+    else {
+      response.redirect('/');
+    }
+  })
 });
+
+app.post('/vote', function(request, response) {
+  // code to add an up or down vote for a content+user combination
+});
+
+
+// Listen
+var port = process.env.PORT || 3000;
+app.listen(port, function() {
+  // This part will only work with Cloud9, and is meant to help you find the URL of your web server :)
+  if (process.env.C9_HOSTNAME) {
+    console.log('Web server is listening on https://' + process.env.C9_HOSTNAME);
+  }
+  else {
+    console.log('Web server is listening on http://localhost:' + port);
+  }
+});
+
