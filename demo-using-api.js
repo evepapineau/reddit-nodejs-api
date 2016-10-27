@@ -4,7 +4,7 @@ var mysql = require('mysql');
 // create a connection to our Cloud9 server
 var connection = mysql.createConnection({
   host     : 'localhost',
-  user     : 'ziad_saab', // CHANGE THIS :)
+  user     : 'evepapineau', // CHANGE THIS :)
   password : '',
   database: 'reddit'
 });
@@ -15,9 +15,9 @@ var redditAPI = reddit(connection);
 
 // It's request time!
 redditAPI.createUser({
-  username: 'hello23',
-  password: 'xxx'
-}, function(err, user) {
+  username: 'evepapineau3',
+  password: 'xxxx'
+},  function(err, user) {
   if (err) {
     console.log(err);
   }
@@ -26,13 +26,34 @@ redditAPI.createUser({
       title: 'hi reddit!',
       url: 'https://www.reddit.com',
       userId: user.id
-    }, function(err, post) {
+    }, 7,function(err, post) {
       if (err) {
         console.log(err);
       }
       else {
-        console.log(post);
+        redditAPI.createSubreddit({
+          name: 'bonjour',
+          description: 'bla',
+          userId: user.id
+      }, function(err, subreddit) {
+        if (err) {
+          console.log(err);
+        }
+        else {
+          console.log(subreddit);
+        }
+        });
       }
     });
   }
 });
+
+
+// redditAPI.getAllPosts(function (err, result) {
+//   if (err) {
+//     console.log('error', err)
+//   }
+//   else {
+//     console.log(result);
+//   }
+// });
