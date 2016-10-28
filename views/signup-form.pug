@@ -1,0 +1,12 @@
+extend layout
+
+block title
+  title Signup to Reddit
+  
+block content
+  form(action="/signup", method="POST")
+    div
+      input(type="text", name="username", placeholder="Enter a username")
+    div
+      input(type="password", name="password", placeholder="Enter a password")
+    button(type="submit") Signup!
