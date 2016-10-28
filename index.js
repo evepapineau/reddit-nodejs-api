@@ -59,12 +59,12 @@ app.get('/', function(request, response) {
   Your job here will be to use the RedditAPI.getAllPosts function to grab the real list of posts.
   For now, we are simulating this with a fake array of posts!
   */
-  redditAPI.getAllPosts({'numPerPage': 25, 'page': 0}, function(err, posts) {
+  redditAPI.getAllPosts({'numPerPage': 25, 'page': 0, 'sortingMethod': 'downvotes'}, function(err, posts) {
     if (err) {
-      response.sendStatus(500);
+      response.sendStatus(500).send("Something went wrong. Please try again.");
     }
     else {
-      console.log(posts)
+      console.log('posts', posts)
       response.render('post-list', {posts: posts});
     }
   });
@@ -74,6 +74,9 @@ app.get('/', function(request, response) {
   Response.render will call the Pug module to render your final HTML.
   Check the file views/post-list.pug as well as the README.md to find out more!
   */
+app.get('/createPost', function(request, response) {
+  response.render('create-content');
+})  
   
 app.post('/createPost', function(request, response) {
   // before creating content, check if the user is logged in
@@ -84,15 +87,16 @@ app.post('/createPost', function(request, response) {
   else {
     // here we have a logged in user, let's create the post with the user!
     redditAPI.createPost({
+      userId: request.loggedInUser[0].userId,
       title: request.body.title,
       url: request.body.url,
-      userId: request.loggedInUser.id
+      subredditId: 1
     }, function(err, post) {
       if (err) {
-        console.log('There was an error. Please try again.' + err)
+        response.status(500).send('There was an error. Please try again.' + err)
       }
       else {
-        response.send("Thank you!")
+        response.send("Thank you!");
       }
     })
   }
@@ -108,7 +112,7 @@ app.post('/login', function(request, response) {
   // hint: you'll have to use response.cookie here
   redditAPI.checkLogin(request.body.username, request.body.password, function(err, user) {
     if (err) {
-      response.status(401).send(err.message);
+      response.status(400).send(err);
     }
     else {
       redditAPI.createSession(user.id, function(err, token) {
@@ -134,7 +138,7 @@ app.post('/signup', function(request, response) {
   // ihnt: you'll have to use bcrypt to hash the user's password
   redditAPI.createUser({'username': request.body.username, 'password': request.body.password}, function(err){
     if (err) {
-      response.sendStatus(400).send("This username is already in use."); 
+      response.status(500).send("This username is already in use."); 
     }
     else {
       response.redirect('/login');
