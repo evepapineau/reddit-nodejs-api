@@ -116,8 +116,8 @@ module.exports = function RedditAPI(conn) {
         }
       }
     )},
-    createPost: function (post, subredditId, callback) {
-      if (!subredditId) {
+    createPost: function (post, callback) {
+      if (!post.subredditId) {
         callback(new Error('subredditId is required'));
         return;
       }
@@ -155,31 +155,38 @@ module.exports = function RedditAPI(conn) {
       }
       var limit = options.numPerPage || 25; // if options.numPerPage is "falsy" then use 25
       var offset = (options.page || 0) * limit;
-      conn.query(
-      `SELECT 
-        posts.id AS postId, 
-        posts.title AS postTitle, 
-        posts.url AS postURL, 
-        posts.userId AS postUserId, 
-        posts.createdAt AS postCreate, 
-        posts.updatedAt AS postsUpdate,
-        posts.subredditId AS postsSubId,
-        users.id AS userId, 
-        users.username AS username, 
-        users.createdAt AS userCreate, 
-        users.updatedAt AS userUpdate,
-        subreddits.id AS subredditsId, 
-        subreddits.name AS subredditsName, 
-        subreddits.description AS subredditsDesc,
-        subreddits.createdAt AS subredditsCreate, 
-        subreddits.updatedAt AS subredditsUpdate  
-      FROM posts 
-      JOIN users ON posts.userId=users.id
-      JOIN subreddits ON posts.subredditId = subreddits.id
-      ORDER BY posts.createdAt DESC
-      LIMIT ? 
-      OFFSET ?`
-        , [limit, offset],
+      var sortingMethod = options.sortingMethod;
+      conn.query(`SELECT 
+          posts.id AS postId, 
+          posts.title AS postTitle, 
+          posts.url AS postURL, 
+          posts.userId AS postUserId, 
+          posts.createdAt AS postCreate, 
+          posts.updatedAt AS postsUpdate,
+          posts.subredditId AS postsSubId,
+          users.id AS userId, 
+          users.username AS username, 
+          users.createdAt AS userCreate, 
+          users.updatedAt AS userUpdate,
+          subreddits.id AS subredditsId, 
+          subreddits.name AS subredditsName, 
+          subreddits.description AS subredditsDesc,
+          subreddits.createdAt AS subredditsCreate, 
+          subreddits.updatedAt AS subredditsUpdate,
+          COUNT(votes.vote=1) as upvotes,
+          COUNT(votes.vote=-1) as downvotes,
+          COUNT(votes.vote) AS voteScore,
+          SUM(votes.vote) AS totalVotes,
+          SUM(votes.vote) / DATEDIFF(NOW(), posts.createdAt) as hotnessRank       
+        FROM posts 
+        JOIN users ON posts.userId=users.id
+        JOIN subreddits ON posts.subredditId = subreddits.id
+        JOIN votes ON votes.postId=posts.id
+        GROUP BY postId        
+        ORDER BY ?
+        LIMIT ? 
+        OFFSET ?
+        `, [sortingMethod, limit, offset],
         function(err, results) {
           if (err) {
             console.log('err', err);
@@ -189,6 +196,7 @@ module.exports = function RedditAPI(conn) {
               return {
                 'id': res.postId,
                 'title': res.postTitle,
+                'vote score': res.voteScoree,
                 'url': res.postURL,
                 'created at': res.postCreate,
                 'updated at': res.postUpdate,
@@ -205,7 +213,7 @@ module.exports = function RedditAPI(conn) {
                   'description': res.subredditsDesc,
                   'created At': res.subredditsCreate,
                   'updated At': res.subredditsUpdate
-                }
+                },
               };
             });
             return callback(null, newArray);
@@ -355,6 +363,20 @@ module.exports = function RedditAPI(conn) {
         }
       );
     },
-    
-  };
-};
+    createOrUpdateVote: function (votes, callback) {
+      var voteArray = [-1, 0, 1];
+      if (voteArray.indexOf(votes.vote)) {
+        conn.query(
+        `INSERT INTO votes SET postId=?, userId=?, vote=? ON DUPLICATE KEY UPDATE vote=?`, 
+        [votes.userId, votes.postId, votes.vote], function (err, result) {
+          if (err) {
+          callback(err);
+        }
+        else {
+          callback(result)
+        } 
+        })
+      }
+    }
+  }
+}
