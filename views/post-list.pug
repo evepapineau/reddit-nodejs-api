@@ -10,5 +10,5 @@ block content
       li.post
         h2
           a(href=post.url)= post.title
-        p Submitted by #{post.username}
+        p Submitted by #{post.user.username}
         p Score: #{post.score} Upvotes: #{post.upVotes} Downvotes: #{post.downVotes}
